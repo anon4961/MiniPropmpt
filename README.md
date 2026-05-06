@@ -1,2 +1,85 @@
-# MiniPropmpt
-Multi-slot custom prompt injection tool for each character/chat room.
+# Mini Prompt
+
+SillyTavern 확장 — 캐릭터/채팅방별 다중 슬롯 프롬프트 주입. 미니 프리셋처럼 가볍게 한 채팅방 혹은 한 캐릭터에 특화된 프롬프트 묶음을 관리합니다.
+
+## 사용 흐름
+
+1. **확장 활성화**: 확장 드로어에서 "확장 전체 활성화" 체크
+2. **슬롯 편집 진입**: 마법봉 메뉴 또는 드로어의 "슬롯 편집 열기" 버튼
+3. **세트 추가**: 캐릭터별/채팅방별 탭에서 "+ 세트 추가"
+4. **슬롯 추가**: 세트 안에 여러 슬롯, 각각 위치/깊이/역할 지정
+5. **자동 주입**: 채팅 시 활성 슬롯이 인풋 컨텍스트에 자동 주입됨
+
+## 주요 기능
+
+- **마법봉 메뉴 + 드로어** 양쪽에서 접근
+- **현재 채팅방 자동 인식** — 팝업을 열면 현재 컨텍스트로 자동 세팅
+- **활성 세트 요약** — 팝업 상단에 캐릭터+채팅방 적용 중인 모든 세트 확인 가능
+- 슬롯별 **위치 지정**:
+  - Before Main Prompt / Story String
+  - After Main Prompt / Story String
+  - In-chat @ Depth (깊이 + 역할 지정)
+- 슬롯별 **역할(role)** 선택: System / User / Assistant
+- 슬롯별 **활성/비활성** 토글, 세트별 토글, 마스터 스위치
+- **드래그앤드롭** 슬롯 순서 변경
+- **{{char}}, {{user}}** 등 SillyTavern 매크로 자동 치환 ([지원 매크로 전체 목록](https://docs.sillytavern.app/usage/core-concepts/macros/) — `{{char}}`, `{{user}}`, `{{persona}}`, `{{description}}`, `{{personality}}`, `{{scenario}}`, `{{lastMessage}}`, `{{input}}`, `{{time}}`, `{{date}}`, `{{random:a,b,c}}`, `{{pick:a,b,c}}`, `{{roll:1d6}}`, `{{getvar::name}}`, `{{setvar::name::val}}` 등)
+- **토큰 카운트** 추정 표시
+- **통합 프리뷰** — 캐릭터+채팅방 합쳐진 최종 주입 결과 확인
+- **Export / Import** (JSON, 미니 프리셋 스타일)
+- **Import 충돌 처리** UI (이름 변경/덮어쓰기/추가 선택)
+- **고아 데이터** 감지·정리 UI
+
+## 캐릭터+채팅방 동시 적용
+
+한 채팅방에서 캐릭터 세트(A)와 채팅방 세트(B)가 모두 활성이면, **A의 슬롯들 + B의 슬롯들이 합쳐져서 주입**됩니다. 팝업 상단의 "현재 적용 중인 세트" 박스에 캐릭터/채팅방 양쪽이 표시되며, "주입 프리뷰" 버튼으로 합쳐진 최종 결과를 확인할 수 있습니다.
+
+## 주입 위치 설명
+
+| 위치 | 설명 |
+|---|---|
+| **Before Main Prompt / Story String** | 시스템 프롬프트보다 더 앞 (가장 약한 위치) |
+| **After Main Prompt / Story String** | 시스템 프롬프트 직후 |
+| **In-chat @ Depth** | 채팅 메시지 사이. depth=0이면 가장 마지막. role(System/User/Assistant) 지정 가능 |
+
+> ⚠️ **작가노트와의 깊이 차이**: 미니프롬은 `CHAT_COMPLETION_PROMPT_READY` 이벤트가 끝나고 `messages` 배열에 직접 splice합니다. 반면 작가노트는 SillyTavern 내부 익스텐션 프롬프트 큐에서 그 이전에 합쳐집니다. 따라서 **같은 depth 0이라도 미니프롬이 더 마지막 위치(=AI에 더 강한 영향)**에 들어갑니다. 작가노트와 미니프롬을 둘 다 depth 0으로 설정하면 미니프롬이 더 뒤(더 강력)입니다. 이건 의도된 동작이며, 작가노트보다 앞에 두려면 미니프롬 depth를 1 이상으로 설정하세요.
+또한, Prefill 혹은 Direction Manager 확장과 같이 가장 끝에 위치해야 하는 프롬프트가 있는 경우, 본 확장에 의한 개별 프롬프트 주입위치는 1 이상으로 하는 것을 권장합니다.
+
+## 데이터 저장
+
+`SillyTavern/data/<user>/settings.json` 안의 `extension_settings.MiniCustomPrompt` 키에 저장됩니다. SillyTavern이 자동으로 백업·복원해주는 표준 위치입니다.
+
+## Export 파일 포맷
+
+미니 프리셋 스타일 JSON. SillyTavern 프리셋과 필드명을 일부 통일했습니다.
+
+```json
+{
+  "type": "MiniCustomPrompt",
+  "version": 1,
+  "name": "세트 이름",
+  "scope": "character",
+  "originalTarget": "MyChar.png",
+  "prompts": [
+    {
+      "name": "슬롯 이름",
+      "enabled": true,
+      "content": "...",
+      "role": "system",
+      "injection_position": 1,
+      "injection_depth": 0,
+      "injection_order": 100,
+      "position_raw": "in_chat"
+    }
+  ]
+}
+```
+
+`type: "MiniCustomPrompt"` 필드로 검증되므로 다른 JSON과 잘못 섞이지 않습니다.
+
+## 제한사항
+
+- **OpenAI 호환 API(Chat Completion)** 에서만 동작. NovelAI Classic, Kobold 등 Text Completion은 미지원
+- **현재 컨텍스트만 편집**: 다른 캐릭터/채팅방의 세트를 보거나 편집하려면 그곳으로 이동 후 작업. (Export/Import로 옮길 수 있음)
+- 캐릭터 카드를 다시 import 하면 새 avatar로 인식되어 데이터 매칭 끊김 → export로 백업 권장
+- 채팅방 rename 자동 마이그레이션은 SillyTavern UI 셀렉터에 의존 (실패해도 데이터 유실은 없음)
+- 다른 확장과 같은 이벤트(`CHAT_COMPLETION_PROMPT_READY`)를 후킹하면 등록 순서에 따라 미세 위치 차이 가능.
